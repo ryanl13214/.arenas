@@ -33,8 +33,10 @@ from '/arena';
 // The game guarantees there will be no global reset during the match.
 // Note that you cannot assign any game objects here, since they are populated on the first tick, not when the script is initialized.
 let myCreeps, enemyCreeps, enemyFlag, myTower, myFlag, enTower;
-var HeroAttacker = [];
-var HeroRanger = [];
+var averageCreepPos;
+var creepsbattleready;
+
+
 var Attackers = [];
 var rangers = [];
 var healers = [];
@@ -77,15 +79,10 @@ export function loop()
 						}
 						if(creep.body.some(i => i.type === RANGED_ATTACK)) // creep contains  ranged attack part
 						{
-								if(HeroRanger.length == 0)
-								{
-										HeroRanger.push(creep);
-								}
-								else if(HeroRanger.length == 1)
-								{
+
 										rangers.push(creep);
 										creep.healer = 1;
-								}
+
 						}
 				});
 				myCreeps.forEach(creep =>
@@ -133,9 +130,12 @@ export function loop()
 						}
 				});
 		}
+
+		averageCreepPositions();
+
 		if(getTime() > 20)
 		{
-				rangedDefender(HeroRanger[0]);
+
 				basicAttacker(Attackers[0]);
 				basicAttacker(Attackers[1]);
 				for(var i = 0; i < rangers.length; i++)
@@ -157,15 +157,91 @@ export function loop()
 				//////////
 				checkForAssaults();
 				///////////
+ checkforgrouping();
+				///////////
 				if(prepAssault == true && assaultNotReady == true)
 				{
 						prepForAssault();
 				}
 				if(NeedDefence())
 				{
+					console.log("defend");
 						defend();
 				}
+				enemyDefendingInAdvantageousPosition();
+
 		}
+
+
+
+
+}
+function enemyDefendingInAdvantageousPosition()
+{
+
+			var enemiesInRange = enemyCreeps.filter(i => getDistance(i, enTower) <35);
+			var enemiesInRange2 = enemyCreeps.filter(i => getDistance(i, enTower) <7);
+
+if(enemiesInRange.length > 10 &&  enemiesInRange2.length < 10){
+
+defend();
+
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+}
+function checkforgrouping()
+{
+	//var averageCreepPos;
+	//var creepsbattleready;
+
+var avgdist = getAverageDistanceBetweenCreeps();
+if(avgdist > 5 && getTime() > 75 && enemyCreeps.length >0  ){
+
+	creepsbattleready=false;
+}else{
+
+	creepsbattleready=true;
+}
+
+	console.log("creeps well grouped ",creepsbattleready);
+
+
+
+}
+function averageCreepPositions()
+{
+	var avgX = 0;
+	var avgY = 0;
+	var count = 0;
+	for(var i = 0; i < myCreeps.length; i++)
+	{
+		if(myCreeps[i].x != myFlag.x && myCreeps[i].y != myFlag.y){
+			count++;
+		  avgX +=	myCreeps[i].x;
+			avgY +=	myCreeps[i].y;
+		}
+
+
+
+	}
+
+averageCreepPos = {"x": Math.floor(avgX/count), "y": Math.floor(avgY/count)};
+
+
+
+
 }
 
 function NeedDefence()
@@ -244,6 +320,7 @@ function prepForAssault()
 
 function moveAllToRallypoint()
 {
+	console.log("moveAllToRallypoint");
 		if(enemyFlag.x == 2)
 		{
 				var rallyppoint = {
@@ -302,7 +379,7 @@ function getAverageDistanceBetweenCreeps()
 						count++;
 				}
 		}
-		console.log("avg", averageDistance / count);
+		//console.log("avg", averageDistance / count);
 		return averageDistance = averageDistance / count;
 }
 
@@ -335,6 +412,7 @@ function checkForStaticDefence(creep)
 		}
 		else if((enemyCreeps.length < 3 && getTime() < FinalFight) /*enemy has few creeps left */ )
 		{
+					prepAssault = true;
 				return true; // collect bodyparts
 		}
 		else
@@ -381,6 +459,10 @@ function FindParts(creep, part)
 
 function basicAttacker(creep)
 {
+	//var averageCreepPos;
+	//var creepsbattleready;
+
+
 		if(!checkForStaticDefence(creep) && (prepAssault == false || assaultNotReady == false))
 		{
 				var enemyCreeps = getObjectsByPrototype(Creep).filter(i => !i.my);
@@ -394,7 +476,14 @@ function basicAttacker(creep)
 				}
 				else
 				{
-						creep.moveTo(targets[0]);
+					if(creepsbattleready ){
+								creep.moveTo(targets[0]);
+					}else{
+						console.log("A moving to avgcreep");
+						creep.moveTo(averageCreepPos);
+					}
+
+
 				}
 				slaveHealer(creep, creep.healer);
 		}
@@ -424,39 +513,63 @@ function slaveHealer(creep, healer)
 
 function rangedAttacker(creep)
 {
-		if(!checkForStaticDefence(creep) && (prepAssault == false || assaultNotReady == false))
+		if(!checkForStaticDefence(creep) && (prepAssault == false || assaultNotReady == false) )
 		{
 				var targets = enemyCreeps.filter(i => true).sort((a, b) => getDistance(a, creep) - getDistance(b, creep));
 				if(targets.length > 0)
 				{
 						var range = 3;
-						var enemiesInRange = enemyCreeps.filter(i => getDistance(i, creep) <= range);
-						if(enemiesInRange.length > 1)
+						var enemiesInRange = enemyCreeps.filter(i => getDistance(i, creep) <= range).sort((a, b) => a.hits - b.hits);
+						var range = 2;
+						var enemiesInMedRange = enemyCreeps.filter(i => getDistance(i, creep) <= range).sort((a, b) => a.hits - b.hits);
+						var range2 = 1;
+						var enemiesInCloseRange = enemyCreeps.filter(i => getDistance(i, creep) <= range2).sort((a, b) => a.hits - b.hits);
+						if(enemiesInCloseRange.length >0)
 						{
 								creep.rangedMassAttack();
 						}
-						else
-						{
-								creep.rangedAttack(targets[0]);
+						else if(enemiesInRange.length >0 && enemiesInMedRange.length < 3)
+				  	{
+								creep.rangedAttack(enemiesInRange[enemiesInRange.length-1]);
+						}
+						else{
+								creep.rangedMassAttack();
 						}
 						if(getTime() < FinalFight)
 						{
-								creep.moveTo(targets[0]);
+							if(creepsbattleready ){
+										creep.moveTo(targets[0]);
+							}else{
+								creep.moveTo(averageCreepPos);
+							}
 						}
 						else
 						{
-								creep.moveTo(enemyFlag);
+							if(creepsbattleready ){
+									creep.moveTo(enemyFlag);
+							}else{
+								creep.moveTo(averageCreepPos);
+							}
+
 						}
 				}
 				else
 				{
-						creep.moveTo(enemyFlag);
+
+					if(creepsbattleready  ){
+									creep.moveTo(enemyFlag);
+					}else{
+		     	creep.moveTo(averageCreepPos);
+					}
+
+
+
 				}
 				var range = 3;
 				var enemiesInRange = enemyCreeps.filter(i => getDistance(i, creep) <= range);
 				if(enemiesInRange.length > 0)
 				{
-						//	 flee(creep, enemiesInRange, range);
+					  flee(creep, enemiesInRange, range);
 				}
 		}
 		else
@@ -469,27 +582,7 @@ function rangedAttacker(creep)
 		}
 }
 
-function rangedDefender(creep)
-{
-		var range = 3;
-		var enemiesInRange = enemyCreeps.filter(i => getDistance(i, creep) <= range);
-		if(enemiesInRange.length > 0 && enemiesInRange.length < 3)
-		{
-				creep.rangedAttack(enemiesInRange[0]);
-		}
-		else
-		{
-				creep.rangedMassAttack();
-		}
-		if(getTime() < FinalFight)
-		{
-				creep.moveTo(myFlag);
-		}
-		else if(enemyCreeps.length < 3)
-		{
-				creep.moveTo(enemyFlag);
-		}
-}
+
 
 function moveToHeal(creep)
 {
