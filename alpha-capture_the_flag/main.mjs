@@ -26,7 +26,7 @@ import
     BodyPart
 }
 from '/arena';
-const ENGAGE_DISTANCE = 4;
+
 // You can also import your files like this:
 // import {roleAttacker} from './roles/attacker.mjs';
 var myCreeps, enCreeps, enFlag, myTower, myFlag, enTower, avgMyCreeppos, avgEnCreeppos, distanceBetweenGroups;
@@ -44,39 +44,52 @@ var getAverageDistanceBetweenCreepsMYACTUAL;
 var defencebool = false;
 var towerTarget;
 var towerbool;
+var creepsActivlyEngagingEnemy;
 var getAverageDistanceBetweenCreepsENACTUAL;
+var enemyUsingQuadSquads = false;
 const FinalFight = 1700;
+const ENGAGE_DISTANCE = 8;
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 export function loop()
 {
     ////////////////////////////////////////////////////////////////////////////////////////////////////////
-  enFlag = getObjectsByPrototype(Flag).find(i => !i.my);
-  myFlag = getObjectsByPrototype(Flag).find(i => i.my);
-  myCreeps = getObjectsByPrototype(Creep).filter(i => i.my);
-  enCreeps = getObjectsByPrototype(Creep).filter(i => !i.my);
-  enTower = getObjectsByPrototype(StructureTower).find(i => !i.my);
-  myTower = getObjectsByPrototype(StructureTower).find(i => i.my);
+    enFlag = getObjectsByPrototype(Flag).find(i => !i.my);
+    myFlag = getObjectsByPrototype(Flag).find(i => i.my);
+    myCreeps = getObjectsByPrototype(Creep).filter(i => i.my);
+    enCreeps = getObjectsByPrototype(Creep).filter(i => !i.my);
+    enTower = getObjectsByPrototype(StructureTower).find(i => !i.my);
+    myTower = getObjectsByPrototype(StructureTower).find(i => i.my);
     ////////////////////////////////////////////////////////////////////////////////////////////////////////
-  if(getTime() === 1)
-  {
-      createCostMatrixs();
-      AssignRoles();
-      if(enFlag.x == 2 && enFlag.y == 2)
-      {
-          myrallyppoint = {
-              "x": 80,
-              "y": 80
-          };
-      }
-      if(enFlag.x == 97 && enFlag.y == 97)
-      {
-          myrallyppoint = {
-              "x": 20,
-              "y": 20
-          };
-      }
-  }
-
+    if(myCreeps == undefined)
+    {
+        myCreeps = [];
+    }
+    if(enCreeps == undefined)
+    {
+        enCreeps = [];
+    }
+    //  myCreeps = getObjectsByPrototype(Creep).filter(i => i.my);
+    //  enCreeps = getObjectsByPrototype(Creep).filter(i => !i.my);
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////
+    if(getTime() === 1)
+    {
+        createCostMatrixs();
+        AssignRoles();
+        if(enFlag.x == 2 && enFlag.y == 2)
+        {
+            myrallyppoint = {
+                "x": 80,
+                "y": 80
+            };
+        }
+        if(enFlag.x == 97 && enFlag.y == 97)
+        {
+            myrallyppoint = {
+                "x": 20,
+                "y": 20
+            };
+        }
+    }
     ////////////////////////////////////////////////////////////////////////////////////////////////////////
     enAvgCreeppos = getAverageCreepPositions("en");
     myAvgCreeppos = getAverageCreepPositions("my");
@@ -86,12 +99,12 @@ export function loop()
     getAverageDistanceBetweenCreepsENACTUAL = getAverageDistanceBetweenCreeps("en");
     distanceBetweenGroups = getDistance(myAvgCreeppos, enAvgCreeppos);
     ////////////////////////////////////////////////////////////////////////////////////////////////////////
-    console.log("getAverageDistanceBetweenCreepsMYACTUAL", getAverageDistanceBetweenCreepsMYACTUAL);
-    console.log("getAverageDistanceBetweenCreepsENACTUAL", getAverageDistanceBetweenCreepsENACTUAL);
-    console.log("IsEnemyDefendingInAdvantageousPositionACTUAL", IsEnemyDefendingInAdvantageousPositionACTUAL);
-    console.log("IsEnemyDefendingBaseACTUAL", IsEnemyDefendingBaseACTUAL);
-    console.log("distanceBetweenGroups", distanceBetweenGroups);
-
+    console.log("getAverageDistanceBetweenCreepsMYACTUAL------", getAverageDistanceBetweenCreepsMYACTUAL);
+    console.log("getAverageDistanceBetweenCreepsENACTUAL------", getAverageDistanceBetweenCreepsENACTUAL);
+    console.log("IsEnemyDefendingInAdvantageousPositionACTUAL-", IsEnemyDefendingInAdvantageousPositionACTUAL);
+    console.log("IsEnemyDefendingBaseACTUAL-------------------", IsEnemyDefendingBaseACTUAL);
+    console.log("distanceBetweenGroups------------------------", distanceBetweenGroups);
+    console.log("defencebool----------------------------------", defencebool);
     if(getTime() > 20)
     {
         RunRoles();
@@ -107,6 +120,26 @@ export function loop()
         {
             chargeFlag();
         }
+    }
+}
+
+function checkForActiveEngagements()
+{
+    var numberEngaged = 0;
+    for(var i = 0; i < myCreeps.length; i++)
+    {
+        if(myCreeps[i].engaged == true)
+        {
+            numberEngaged++;
+        }
+    }
+    if(numberEngaged > 1)
+    {
+        creepsActivlyEngagingEnemy = true;
+    }
+    else
+    {
+        creepsActivlyEngagingEnemy = false;
     }
 }
 
@@ -127,25 +160,31 @@ function NeedDefence()
     var enCreepsCloserToMyFlagThanMyAvgPos = 0;
     for(var i = 0; i < enCreeps.length; i++)
     {
-        if(getDistance(enCreeps[i], myFlag) < getDistance(myFlag, myAvgCreeppos))
+        if(getDistance(enCreeps[i], myFlag) < getDistance(myFlag, myAvgCreeppos) + 5)
         {
             enCreepsCloserToMyFlagThanMyAvgPos++;
         }
+    }
+    if(getDistance(myAvgCreeppos, myFlag) < 30 && getDistance(enAvgCreeppos, myFlag) > 35)
+    {
+        defencebool = false;
+        return false;
     }
     if(enCreepsCloserToMyFlagThanMyAvgPos > 3)
     {
         defencebool = true;
         return true;
     }
-    if(getDistance(myAvgCreeppos, myFlag) > 8 && defencebool)
+    if(getDistance(myAvgCreeppos, myFlag) > ENGAGE_DISTANCE && defencebool && !creepsActivlyEngagingEnemy)
     {
         return true;
     }
-    if(getDistance(myAvgCreeppos, myFlag) < 8 && defencebool)
+    if(getDistance(myAvgCreeppos, myFlag) < ENGAGE_DISTANCE && defencebool)
     {
         defencebool = false;
+        return false;
     }
-    if(getDistance(enAvgCreeppos, myFlag) < getDistance(myAvgCreeppos, myFlag) || getDistance(enAvgCreeppos, myFlag) < 30)
+    if((getDistance(enAvgCreeppos, myFlag) < getDistance(myAvgCreeppos, myFlag) && !creepsActivlyEngagingEnemy ) || (getDistance(enAvgCreeppos, myFlag) < 30 && getDistance(myAvgCreeppos, myFlag) > 25) )
     {
         defencebool = true;
         return true;
@@ -201,25 +240,43 @@ function decideBestTarget(creep, range)
             enranger.push(enemiesInRange[i]);
         }
     }
-    for(var i = 0; i < enAttk.length; i++)
+    if(!enemyUsingQuadSquads) // enemy not using quadsquads
     {
-        if(enAttk[i].hits > 800) // low priority move
+        for(var i = 0; i < enAttk.length; i++)
         {
-            return enAttk[i];
+            if(enAttk[i].hits > 800) // low priority move
+            {
+                return enAttk[i];
+            }
+        }
+        for(var i = 0; i < enheal.length; i++)
+        {
+            if(enheal[i].hits > 350) // low priority move
+            {
+                return enheal[i];
+            }
+        }
+        for(var i = 0; i < enranger.length; i++)
+        {
+            if(enranger[i].hits > 350) // low priority move
+            {
+                return enranger[i];
+            }
         }
     }
-    for(var i = 0; i < enheal.length; i++)
+    else
     {
-        if(enheal[i].hits > 350) // low priority move
+        if(enAttk.length > 0)
         {
-            return enheal[i];
+            return enAttk[0];
         }
-    }
-    for(var i = 0; i < enranger.length; i++)
-    {
-        if(enranger[i].hits > 350) // low priority move
+        if(enheal.length > 0)
         {
-            return enranger[i];
+            return enheal[0];
+        }
+        if(enranger.length > 0)
+        {
+            return enranger[0];
         }
     }
     return enemiesInRange[0];
@@ -230,17 +287,96 @@ function getcreephealthPercentage(creep)
     return (creep.hitsMax / 100) * creep.hits;
 }
 
+function getState(creep)
+{
+    var targets = enCreeps.filter(i => true).sort((a, b) => getDistance(a, myAvgCreeppos) - getDistance(b, myAvgCreeppos));
+    if(creepsActivlyEngagingEnemy)
+    {
+        return "FullEngage";
+    }
+    if(getDistance(enFlag, myAvgCreeppos) < 10)
+    {
+        return "chargeFlagDisordered";
+    }
+    if(getcreephealthPercentage(creep) < 55)
+    {
+        return "runFromCombat";
+    }
+    if(IsEnemyDefendingBaseACTUAL || (enCreeps == undefined || enCreeps.length < 2) && getTime() < FinalFight)
+    {
+        return "findParts";
+    }
+    else if(IsEnemyDefendingInAdvantageousPositionACTUAL && getDistance(targets[0], myAvgCreeppos) > ENGAGE_DISTANCE)
+    {
+        return "enemyDefendingRally";
+    }
+    else if(getTime() > FinalFight && enCreeps.length < 4)
+    {
+        return "chargeAtEnFlag";
+    }
+    else if(getTime() > FinalFight || (!IsEnemyDefendingInAdvantageousPositionACTUAL || getDistance(targets[0], myAvgCreeppos) < 10)) // enemy close or enemy is not in good position and after final fight
+    {
+        if(distanceBetweenGroups < 15 || (distanceBetweenGroups < 25 && (getAverageDistanceBetweenCreepsENACTUAL - 1 > getAverageDistanceBetweenCreepsMYACTUAL || getDistance(targets[0], myAvgCreeppos) < 10 || getAverageDistanceBetweenCreepsMYACTUAL == 1 || getAverageDistanceBetweenCreepsMYACTUAL == 2)))
+        {
+            return "MyCreepsWellGroupedOrCloseToEnemy";
+        }
+        else if(getAverageDistanceBetweenCreepsMYACTUAL < getAverageDistanceBetweenCreepsENACTUAL || getAverageDistanceBetweenCreepsMYACTUAL == 1 || getAverageDistanceBetweenCreepsMYACTUAL == 2)
+        {
+            return "MyCreepsWellGroupedAndNotCloseToEnemy";
+        }
+        else if(getAverageDistanceBetweenCreepsMYACTUAL >= getAverageDistanceBetweenCreepsENACTUAL && !IsEnemyDefendingBaseACTUAL)
+        {
+            return "MyCreepsNotWellGroupedAndEnemyNotDefendingBase";
+        }
+        else
+        {
+            return "internal unbound 1";
+        }
+    }
+    else if(creep.healer == 999 && getTime() > FinalFight)
+    {
+        return "sitOnFlag";
+    }
+    else
+    {
+        return "unbound";
+    }
+}
+
 function basicCreepCombarIntents(creep)
 {
     //   creep.role= "ranger";creep.role= "healer";  creep.role= "attacker";
+    var enemiesInRange = enCreeps.filter(i => getDistance(i, creep) <= 3);
+    if(enemiesInRange.length != 0)
+    {
+        creep.engaged = true;
+    }
+    else
+    {
+        creep.engaged = false;
+    }
     if(creep != undefined && creep.body != undefined && creep.body.length != 0)
     {
         if(creep.role == "healer") // todo change to role in memory
         {
-            var healTargets = myCreeps.filter(i => getDistance(i, creep) <= 3).filter(i => i.hits != i.hitsMax).sort((a, b) => getcreephealthPercentage(a) - getcreephealthPercentage(b));
+            var healTargets = myCreeps.filter(i => getDistance(i, creep) <= 1).filter(i => i.hits + 48 <= i.hitsMax).sort((a, b) => getcreephealthPercentage(a) - getcreephealthPercentage(b));
             if(healTargets.length != 0)
             {
+                creep.engaged = false;
                 creep.heal(healTargets[0]);
+            }
+            else
+            {
+                var healTargets = myCreeps.filter(i => getDistance(i, creep) <= 3).filter(i => i.hits + 16 <= i.hitsMax).sort((a, b) => getcreephealthPercentage(a) - getcreephealthPercentage(b));
+                if(healTargets.length != 0)
+                {
+                    creep.engaged = false;
+                    creep.rangedHeal(healTargets[0]);
+                }
+                else
+                {
+                    creep.heal(creep);
+                }
             }
         }
         if(creep.role == "attacker")
@@ -249,6 +385,18 @@ function basicCreepCombarIntents(creep)
             if(enemiesInRange.length != 0)
             {
                 creep.attack(decideBestTarget(creep, 1));
+            }
+            else
+            {
+              if(enTower != undefined)
+              {
+                var tmp = getDistance(enTower, creep);
+                if(tmp < 1)
+                {
+                    creep.attack(enTower);
+                }
+}
+
             }
         }
         if(creep.role == "ranger")
@@ -269,46 +417,68 @@ function basicCreepCombarIntents(creep)
                     creep.rangedMassAttack();
                 }
             }
+            else
+            {
+                if(enTower != undefined)
+                {
+                    var tmp = getDistance(enTower, creep);
+                    if(tmp < 4)
+                    {
+                        creep.rangedAttack(enTower);
+                    }
+                }
+            }
         }
     }
 }
 
-function basicAttacker(creep)
+function basicALLCreep(creep)
 {
     basicCreepCombarIntents(creep);
+    var creepState = getState(creep);
     var targets = enCreeps.filter(i => true).sort((a, b) => getDistance(a, creep) - getDistance(b, creep));
-    if(IsEnemyDefendingBaseACTUAL || (enCreeps == undefined || enCreeps.length < 2))
+    if(creepState == "FullEngage")
+    {
+        creep.moveTo(targets[0]);
+    }
+    if(creepState == "runFromCombat")
+    {
+        //  flee(creep, targets, 6)
+        creep.moveTo(myFlag);
+    }
+    if(creepState == "chargeFlagDisordered")
+    {
+        creep.moveTo(enFlag);
+    }
+    if(creepState == "findParts")
     {
         FindParts(creep, "attack");
     }
-    else if(IsEnemyDefendingInAdvantageousPositionACTUAL && getDistance(targets[0], creep) > ENGAGE_DISTANCE)
+    if(creepState == "enemyDefendingRally")
     {
         creep.moveTo(myrallyppoint);
-        // moveToRally//
     }
-    else if(getTime() > FinalFight || (!IsEnemyDefendingInAdvantageousPositionACTUAL || getDistance(targets[0], creep) < 10))
+    if(creepState == "MyCreepsWellGroupedOrCloseToEnemy")
     {
-        if(distanceBetweenGroups < 15 || (distanceBetweenGroups < 25 && (getAverageDistanceBetweenCreepsENACTUAL - 1 > getAverageDistanceBetweenCreepsMYACTUAL || getAverageDistanceBetweenCreepsMYACTUAL ==1)))
+        creep.moveTo(targets[0]);
+    }
+    if(creepState == "MyCreepsWellGroupedAndNotCloseToEnemy")
+    {
+        if(getDistance(targets[0], creep) > 1)
         {
-            var targets = enCreeps.filter(i => true).sort((a, b) => getDistance(a, creep) - getDistance(b, creep));
             creep.moveTo(targets[0]);
         }
-        else if(getAverageDistanceBetweenCreepsMYACTUAL < getAverageDistanceBetweenCreepsENACTUAL || getAverageDistanceBetweenCreepsMYACTUAL ==1)
+        else
         {
-            var targets = enCreeps.filter(i => true).sort((a, b) => getDistance(a, creep) - getDistance(b, creep));
-            if(getDistance(targets[0], creep) > 1)
-            {
-                creep.moveTo(targets[0]);
-            }
-        }
-        else if(getAverageDistanceBetweenCreepsMYACTUAL >= getAverageDistanceBetweenCreepsENACTUAL && !IsEnemyDefendingBaseACTUAL)
-        {
-            creep.moveTo(myAvgCreeppos);
+            creep.moveTo(enFlag);
         }
     }
-    if(getTime() > FinalFight && enCreeps.length + 3 < myCreeps.length)
+    if(creepState == "MyCreepsNotWellGroupedAndEnemyNotDefendingBase")
     {
-        //charge as one
+        creep.moveTo(myAvgCreeppos);
+    }
+    if(creepState == "chargeAtEnFlag")
+    {
         creep.moveTo(enFlag);
     }
 }
@@ -344,62 +514,6 @@ function healer(creep)
     else
     {
         basichealer(creep);
-    }
-}
-
-function rangedAttacker(creep)
-{
-    //  console.log("IsEnemyDefendingInAdvantageousPositionACTUAL-",IsEnemyDefendingInAdvantageousPositionACTUAL);
-    basicCreepCombarIntents(creep);
-    var targets = enCreeps.filter(i => true).sort((a, b) => getDistance(a, creep) - getDistance(b, creep));
-    if(IsEnemyDefendingBaseACTUAL || (enCreeps == undefined || enCreeps.length < 2))
-    {
-        if(getObjectById(creep.healer) != undefined)
-        {
-            FindParts(creep, "ranged_attack");
-        }
-        else
-        {
-            creep.moveTo(myrallyppoint);
-        }
-    }
-    else if(IsEnemyDefendingInAdvantageousPositionACTUAL && getDistance(targets[0], creep) > ENGAGE_DISTANCE)
-    {
-        creep.moveTo(myrallyppoint);
-        // moveToRally//
-    }
-    else if(getTime() > FinalFight || (!IsEnemyDefendingInAdvantageousPositionACTUAL || getDistance(targets[0], creep) < 10))
-    {
-        if(distanceBetweenGroups < 10 || (distanceBetweenGroups < 20 && (getAverageDistanceBetweenCreepsENACTUAL - 1 > getAverageDistanceBetweenCreepsMYACTUAL || getAverageDistanceBetweenCreepsMYACTUAL ==1)))
-        {
-            var targets = enCreeps.filter(i => true).sort((a, b) => getDistance(a, creep) - getDistance(b, creep));
-            if(getDistance(targets[0], creep) > 3)
-            {
-                creep.moveTo(targets[0]);
-            }
-        }
-        else if(getAverageDistanceBetweenCreepsMYACTUAL < getAverageDistanceBetweenCreepsENACTUAL || getAverageDistanceBetweenCreepsMYACTUAL ==1)
-        {
-            var targets = enCreeps.filter(i => true).sort((a, b) => getDistance(a, creep) - getDistance(b, creep));
-            if(getDistance(targets[0], creep) > 3)
-            {
-                creep.moveTo(targets[0]);
-            }
-        }
-        else if(getAverageDistanceBetweenCreepsMYACTUAL >= getAverageDistanceBetweenCreepsENACTUAL)
-        {
-            //	move to enemy avg
-            creep.moveTo(myAvgCreeppos);
-        }
-    }
-    if(getTime() > FinalFight && enCreeps.length + 3 < myCreeps.length)
-    {
-        //charge as one
-        creep.moveTo(enFlag);
-    }
-    if(creep.healer == 999 && getTime() > FinalFight)
-    {
-        creep.moveTo(myFlag);
     }
 }
 
@@ -518,29 +632,20 @@ function getAverageCreepPositions(a)
     }
     else
     {
-
-
-
-      if(enFlag.x == 2 && enFlag.y == 2)
-      {
-          return   {
-              "x": 80,
-              "y": 80
-          };
-      }
-      if(enFlag.x == 97 && enFlag.y == 97)
-      {
-          return  {
-              "x": 20,
-              "y": 20
-          };
-      }
-
-
-
-
-
-
+        if(enFlag.x == 2 && enFlag.y == 2)
+        {
+            return {
+                "x": 80,
+                "y": 80
+            };
+        }
+        if(enFlag.x == 97 && enFlag.y == 97)
+        {
+            return {
+                "x": 20,
+                "y": 20
+            };
+        }
     }
 }
 
@@ -558,6 +663,53 @@ function defend()
     {
         healers[i].moveTo(myFlag);
     }
+}
+
+function detectQuadSqauds(arr)
+{
+    var creepArry = [];
+    var detectedQuadsmembers = 0;
+    if(arr === "en")
+    {
+        creepArry = enCreeps;
+    }
+    if(arr === "my")
+    {
+        creepArry = myCreeps;
+    }
+    for(var i = 0; i < creepArry.length; i++)
+    {
+        var count = 0;
+        if(getDistance(creepArry[i], myFlag) > 6 && getDistance(creepArry[i], enFlag) > 6)
+        {
+            for(var j = 0; j < creepArry.length; j++)
+            {
+                if(getDistance(creepArry[j], creepArry[i]) == 1)
+                {
+                    count++;
+                }
+            }
+        }
+        if(count == 3)
+        {
+            detectedQuadsmembers++;
+        }
+    }
+    if(detectedQuadsmembers == 12)
+    {
+        enemyUsingQuadSquads = true;
+        return 3;
+    }
+    if(detectedQuadsmembers == 8)
+    {
+        enemyUsingQuadSquads = true;
+        return 2;
+    }
+    if(detectedQuadsmembers == 4)
+    {
+        return 1;
+    }
+    return 0;
 }
 
 function getAverageDistanceBetweenCreeps(arr)
@@ -579,7 +731,7 @@ function getAverageDistanceBetweenCreeps(arr)
         {
             for(var j = 0; j < creepArry.length; j++)
             {
-                if(getDistance(creepArry[j], myFlag) > 6 && getDistance(creepArry[j], enFlag) > 6)
+                if(getDistance(creepArry[j], myFlag) > 6 && getDistance(creepArry[j], enFlag) > 6 &&    getDistance(creepArry[i], creepArry[j]) < 10 )
                 {
                     averageDistance += getDistance(creepArry[i], creepArry[j]);
                     count++;
@@ -587,17 +739,16 @@ function getAverageDistanceBetweenCreeps(arr)
             }
         }
     }
-    if(count > 0)
+    var a = detectQuadSqauds(arr);
+    if(count > 0 && a == 0)
     {
         return Math.floor(averageDistance / count);
     }
     else
     {
-        return 0;
+        return 2;
     }
 }
-
-
 
 function FindParts(creep, part)
 {
@@ -660,6 +811,7 @@ function AssignRoles()
 {
     myCreeps.forEach(creep =>
     {
+        creep.engaged = false;
         if(creep.body.some(i => i.type === ATTACK)) // creep contains attack part
         {
             Attackers.push(creep);
@@ -726,11 +878,11 @@ function RunRoles()
 {
     for(var i = 0; i < Attackers.length; i++)
     {
-        basicAttacker(Attackers[i]);
+        basicALLCreep(Attackers[i]);
     }
     for(var i = 0; i < rangers.length; i++)
     {
-        rangedAttacker(rangers[i]);
+        basicALLCreep(rangers[i]);
     }
     for(var i = 0; i < healers.length; i++)
     {
