@@ -184,40 +184,22 @@ function NeedDefence()
     var enCreepsCloserToMyFlagThanMyAvgPos = 0;
     for(var i = 0; i < enCreeps.length; i++)
     {
-        if(getDistance(enCreeps[i], myFlag) + 1 < getDistance(myFlag, myAvgCreeppos))
+        if(getDistance(enCreeps[i], myFlag) + 1 < getDistance(myFlag, myAvgCreeppos) &&  getDistance(enCreeps[i], myFlag) < 50)
         {
             enCreepsCloserToMyFlagThanMyAvgPos++;
         }
     }
-    if(enCreepsCloserToMyFlagThanMyAvgPos == 0)
-    {
-        defencebool = false;
-        return false;
-    }
+
     if(enCreepsCloserToMyFlagThanMyAvgPos > 3)
     {
-        defencebool = true;
         return true;
     }
-    if(getDistance(myAvgCreeppos, myFlag) > ENGAGE_DISTANCE && defencebool && !creepsActivlyEngagingEnemy)
-    {
-        return true;
-    }
-    if(getDistance(myAvgCreeppos, myFlag) < ENGAGE_DISTANCE && defencebool)
-    {
-        defencebool = false;
+
+
+
+
         return false;
-    }
-    if((getDistance(enAvgCreeppos, myFlag) < getDistance(myAvgCreeppos, myFlag) && !creepsActivlyEngagingEnemy) || ((getDistance(enAvgCreeppos, myFlag) < 30 && getDistance(myAvgCreeppos, myFlag) > 25) && !creepsActivlyEngagingEnemy))
-    {
-        defencebool = true;
-        return true;
-    }
-    else
-    {
-        defencebool = false;
-        return false;
-    }
+
 }
 
 function decideIfMassAttack(creep)
@@ -525,6 +507,7 @@ function getState()
 {
     var targets = enCreeps.filter(i => true).sort((a, b) => getDistance(a, myAvgCreeppos) - getDistance(b, myAvgCreeppos));
     var mycreepsclosetoenflag = myCreeps.filter(i => getDistance(i, enFlag) <= 10);
+      currentState = "unbound";
     var topCorridor = {
         "x": 65,
         "y": 35
@@ -547,7 +530,7 @@ function getState()
     {
         currentState = "enemyDefendingChokePoint";
     }
-    else if((currentState == "FullEngage" || currentState == "MyCreepsWellGroupedOrCloseToEnemy") && enTower != undefined && getDistance(myAvgCreeppos, enTower) < 30)
+    else if((currentState == "FullEngage"  ) && enTower != undefined && getDistance(myAvgCreeppos, enTower) < 35 && getTime() < FinalFight)
     {
         currentState = "disEngage";
     }
@@ -567,35 +550,37 @@ function getState()
     {
         currentState = "enemyDefendingRally";
     }
-    else if((getTime() > FinalFight || (!IsEnemyDefendingInAdvantageousPositionACTUAL || getDistance(targets[0], myAvgCreeppos) < 10)) && distanceBetweenGroups < 15 || (distanceBetweenGroups < 25 && (getAverageDistanceBetweenCreepsENACTUAL - 1 > getAverageDistanceBetweenCreepsMYACTUAL || getDistance(targets[0], myAvgCreeppos) < 10 || getAverageDistanceBetweenCreepsMYACTUAL == 1 || getAverageDistanceBetweenCreepsMYACTUAL == 2)))
+    else if(getAverageDistanceBetweenCreepsMYACTUAL > 3 && distanceBetweenGroups < 13)
     {
-        currentState = "MyCreepsWellGroupedOrCloseToEnemy";
+        currentState = "regroup";
     }
-    else if((getTime() > FinalFight || (!IsEnemyDefendingInAdvantageousPositionACTUAL || getDistance(targets[0], myAvgCreeppos) < 10)) && getAverageDistanceBetweenCreepsMYACTUAL < getAverageDistanceBetweenCreepsENACTUAL || getAverageDistanceBetweenCreepsMYACTUAL == 1 || getAverageDistanceBetweenCreepsMYACTUAL == 2)
+    else if( (getAverageDistanceBetweenCreepsMYACTUAL <4 && getAverageDistanceBetweenCreepsMYACTUAL <=  getAverageDistanceBetweenCreepsENACTUAL  )  && distanceBetweenGroups > 13 + getAverageDistanceBetweenCreepsMYACTUAL )
     {
         currentState = "MyCreepsWellGroupedAndNotCloseToEnemy";
     }
-    else if((getTime() > FinalFight || (!IsEnemyDefendingInAdvantageousPositionACTUAL || getDistance(targets[0], myAvgCreeppos) < 10)) && getAverageDistanceBetweenCreepsMYACTUAL >= getAverageDistanceBetweenCreepsENACTUAL && !IsEnemyDefendingBaseACTUAL)
+
+    else if(getAverageDistanceBetweenCreepsMYACTUAL < 3 && distanceBetweenGroups < 11 + getAverageDistanceBetweenCreepsMYACTUAL )
     {
-        currentState = "MyCreepsNotWellGroupedAndEnemyNotDefendingBase";
+        currentState = "FullEngage";
     }
-    else if(creep.healer == 999 && getTime() > FinalFight)
-    {
-        currentState = "sitOnFlag";
-    }
-    else if(checkForActiveEngagements())
+
+
+
+    if(checkForActiveEngagements())
     {
         creepsActivlyEngagingEnemy = true;
         currentState = "FullEngage";
     }
-    else
-    {
-        currentState = "unbound";
-    }
+
+
     if(NeedDefence())
     {
         currentState = "defend";
     }
+
+
+
+
 }
 
 function basicCreepCombarIntents(creep)
@@ -692,6 +677,13 @@ function basicALLCreep(creep)
     {
         creepState = "defend";
     }
+    if(creepState == "regroup")
+    {
+
+      creep.moveTo(myAvgCreeppos);
+}
+
+
     if(creepState == "defend")
     {
         //  flee(creep, targets, 6)
@@ -765,7 +757,7 @@ function basicALLCreep(creep)
             }
         }
     }
-    var targets = enCreeps.filter(i => true).sort((a, b) => getDistance(a, creep) - getDistance(b, creep));
+    var targets = enCreeps.filter(i => true).sort((a, b) => getDistance(a, myAvgCreeppos) - getDistance(b, myAvgCreeppos));
     if(creepState == "FullEngage")
     {
         if(checkIfInCombatZone(creep))
@@ -802,25 +794,45 @@ function basicALLCreep(creep)
     }
     if(creepState == "MyCreepsWellGroupedAndNotCloseToEnemy")
     {
-        var targets = enCreeps.filter(i => true).sort((a, b) => getDistance(a, creep) - getDistance(b, creep));
-        creep.moveTo(targets[0]);
+      if(checkIfInCombatZone(creep))
+      {
+          smartMove(creep);
+      }
+      else
+      {
+  var targets = enCreeps.filter(i => true).sort((a, b) => getDistance(a, myAvgCreeppos) - getDistance(b, myAvgCreeppos));
+
+  if( getDistance(creep, myAvgCreeppos) < 10){
+    creep.moveTo(targets[0]);
+  }
+  else
+  {
+    creep.moveTo(myAvgCreeppos);
+  }
+
+
+
+      }
     }
-    if(creepState == "MyCreepsNotWellGroupedAndEnemyNotDefendingBase")
-    {
-        creep.moveTo(myAvgCreeppos);
-    }
+
     if(creepState == "chargeAtEnFlag")
+    {
+        creep.moveTo(enFlag);
+    }
+
+    if(creepState == "unbound")
     {
         creep.moveTo(enFlag);
     }
     if(getcreephealthPercentage(creep) < 55 && creepState != "chargeFlagDisordered" && creepState != "chargeAtEnFlag")
     {
+      console.log("creep retreat ", getcreephealthPercentage(creep));
         creep.moveTo(myFlag);
     }
-    if(creepState == "unbound")
-    {
-        creep.moveTo(enFlag);
-    }
+
+
+
+
 }
 
 function basichealer(creep)
